@@ -1,10 +1,13 @@
 import React, { Component } from "react";
+import { trySignIn, trySignOut } from "../../store/actions/index";
+import { connect } from "react-redux";
 
 class GoogleOauth extends Component {
-  state = {
-    isSignedIn: null,
-  };
-  componentDidMount() {
+  constructor(props) {
+    super(props);
+    this.onSignIn = this.onSignIn.bind(this);
+    this.onSignOut = this.onSignOut.bind(this);
+    this.onAuthChange = this.onAuthChange.bind(this);
     window.gapi.load("client:auth2", () => {
       window.gapi.client
         .init({
@@ -14,23 +17,56 @@ class GoogleOauth extends Component {
         })
         .then(() => {
           this.auth = window.gapi.auth2.getAuthInstance();
-          this.setState({
-            isSignedIn: this.auth.isSignedIn.get(),
-          });
+          this.onAuthChange(this.auth.isSignedIn.get());
+          this.auth.isSignedIn.listen(this.onAuthChange);
         });
     });
   }
-  renderAuthButton() {
-    if (this.state.isSignedIn === null) {
-      return <div>I don't know if i signed in </div>;
-    } else if (this.state.isSignedIn === true) {
-      return <div>I'm signed in </div>;
+
+  onAuthChange(isSignIn) {
+    if (isSignIn) {
+      this.props.trySignIn(this.auth);
+    } else {
+      this.props.trySignOut();
     }
-    return <div>I'm not signed in </div>;
   }
+  onSignIn() {
+    this.auth.signIn();
+  }
+  onSignOut() {
+    this.auth.signOut();
+  }
+
   render() {
-    return <div className="item">  {this.renderAuthButton()} </div>;
+    return (
+      <div className="item">
+        {this.props.isSignIn && (
+          <button onClick={this.onSignOut} className="ui button red google">
+            <i className="google icon" />
+            sign out user {this.props.currentUser}
+          </button>
+        )}
+        {!this.props.isSignIn && (
+          <button onClick={this.onSignIn} className="ui button red google">
+            <i className="google icon" />
+            sign in
+          </button>
+        )}
+      </div>
+    );
   }
 }
 
-export default GoogleOauth;
+const mapDispatchToProps = (dispatch) => {
+  return {
+    trySignIn: (auth) => dispatch(trySignIn( auth)),
+    trySignOut: () => dispatch(trySignOut()),
+  };
+};
+const mapStateToProps = (state) => {
+  return {
+    isSignIn: state.isAuth.isSignedIn,
+    currentUser : state.isAuth.currentUser 
+  };
+};
+export default connect(mapStateToProps, mapDispatchToProps)(GoogleOauth);
